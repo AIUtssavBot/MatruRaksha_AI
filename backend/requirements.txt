@@ -1,0 +1,15 @@
+fastapi==0.104.1 
+uvicorn==0.24.0 
+python-dotenv==1.0.0 
+supabase 
+httpx 
+pydantic 
+numpy
+pandas 
+scikit-learn 
+tensorflow 
+keras 
+python-multipart 
+pytest 
+pytest-asyncio
+recharts
