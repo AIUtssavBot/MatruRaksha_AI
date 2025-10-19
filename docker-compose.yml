@@ -1,23 +1,24 @@
 version: '3.8'
 
 services:
-  backend:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: matruraksha_backend
+    container_name: matruraksha_app
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "80:80"
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-    volumes:
-      - ./backend:/app:ro
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
