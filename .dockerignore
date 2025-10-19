@@ -1,0 +1,16 @@
+venv/
+venv*/
+backend/venv*/
+backend/venv312/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+node_modules/
+.venv/
+.git
+.pytest_cache/
+dist/
+build/
+*.egg-info
+/.vscode
