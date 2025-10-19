@@ -5,99 +5,66 @@ Medication Agent - Medication Management
 from typing import Dict, Any, List
 from datetime import datetime
 
+from agents.base_agent import BaseAgent
 
-class MedicationAgent:
-    """
-    Manages medication schedules and reminders
-    """
+
+class MedicationAgent(BaseAgent):
+    """Agent for medication and supplement guidance"""
     
     def __init__(self):
-        self.requests_processed = 0
+        super().__init__(
+            agent_name="Medication Agent",
+            agent_role="Medication Safety Specialist"
+        )
     
-    async def review_medications(self, mother_data: Dict, risk_result: Dict) -> Dict[str, Any]:
-        """Review and recommend medications"""
-        self.requests_processed += 1
-        
-        print(f"[MEDICATION AGENT] Reviewing medications...")
-        
-        hemoglobin = mother_data.get("hemoglobin", 12)
-        risk_factors = risk_result.get("risk_factors", [])
-        
-        medications = {
-            "regular_medications": self._get_regular_medications(),
-            "conditional_medications": self._get_conditional_medications(hemoglobin, risk_factors),
-            "schedule": self._create_medication_schedule(),
-            "important_notes": self._get_medication_notes()
-        }
-        
-        print(f"[MEDICATION AGENT] Medication review complete")
-        
-        return medications
-    
-    def _get_regular_medications(self) -> List[Dict]:
-        return [
-            {
-                "name": "Folic Acid",
-                "dosage": "5 mg",
-                "frequency": "Once daily",
-                "time": "Morning after breakfast",
-                "duration": "Throughout pregnancy"
-            },
-            {
-                "name": "Calcium",
-                "dosage": "500 mg",
-                "frequency": "Twice daily",
-                "time": "After meals",
-                "duration": "Throughout pregnancy"
-            }
-        ]
-    
-    def _get_conditional_medications(self, hemoglobin: float, risk_factors: List) -> List[Dict]:
-        conditional = []
-        
-        if hemoglobin < 11:
-            conditional.append({
-                "name": "Iron (Ferrous Sulfate)",
-                "dosage": "100-200 mg",
-                "frequency": "Once daily",
-                "time": "Morning with orange juice",
-                "note": "May cause constipation - increase fiber intake"
-            })
-        
-        for factor in risk_factors:
-            if factor.get("factor") == "blood_pressure" and factor.get("risk") != "low":
-                conditional.append({
-                    "name": "Consult doctor for BP medication",
-                    "note": "Do not self-medicate for blood pressure"
-                })
-        
-        return conditional
-    
-    def _create_medication_schedule(self) -> Dict:
-        return {
-            "morning": ["Folic Acid", "Iron (if prescribed)"],
-            "afternoon": ["Calcium"],
-            "evening": ["Calcium"]
-        }
-    
-    def _get_medication_notes(self) -> List[str]:
-        return [
-            "Take medications at the same time daily",
-            "Do not skip doses",
-            "Take iron separately from calcium (2 hours apart)",
-            "Report any side effects to doctor",
-            "Keep all medications out of reach of children"
-        ]
-    
-    async def handle_query(self, mother_id: str, query: str, context: Dict) -> Dict:
-        return {
-            "agent": "medication_agent",
-            "response": "Remember to take your medications as prescribed. "
-                       "Iron should be taken with vitamin C for better absorption."
-        }
-    
-    async def get_today_medications(self, mother_id: str) -> Dict:
-        return {"taken": 2, "total": 3, "next_dose": "Calcium at 6:00 PM"}
-    
-    def get_status(self) -> Dict:
-        return {"status": "active", "requests_processed": str(self.requests_processed)}
+    def get_system_prompt(self) -> str:
+        return """
+You are a MEDICATION SAFETY SPECIALIST for MatruRaksha AI.
+
+Your role: Provide information about medications and supplements during pregnancy.
+
+CRITICAL: You do NOT prescribe medications. Always refer to healthcare provider for prescriptions.
+
+AREAS YOU COVER:
+- Safe over-the-counter medications
+- Prenatal vitamins and supplements
+- Managing side effects
+- Drug safety categories
+- Medication timing and dosage (general info only)
+- Interactions and contraindications
+- When to call doctor about medications
+
+SAFE OTC MEDICATIONS (generally):
+- Acetaminophen/Paracetamol (for pain/fever)
+- Some antacids
+- Certain antihistamines
+- Specific cough suppressants
+
+AVOID (unless prescribed):
+- NSAIDs (ibuprofen, aspirin) - especially in 3rd trimester
+- Most herbal supplements
+- Codeine-based medications
+- ACE inhibitors
+- Tetracyclines
+
+ESSENTIAL SUPPLEMENTS:
+- Prenatal vitamin
+- Folic acid (before and during early pregnancy)
+- Iron (if deficient)
+- Calcium (if insufficient dietary intake)
+- Vitamin D
+
+APPROACH:
+- Always emphasize consulting healthcare provider first
+- Provide general safety information
+- Explain pregnancy safety categories when relevant
+- Warn about potential risks
+- Never recommend dosages - that's doctor's role
+- Encourage questions for next prenatal visit
+
+CRITICAL REMINDERS:
+- NEVER suggest stopping prescribed medications without doctor approval
+- NEVER recommend specific medications - only general information
+- ALWAYS advise consulting healthcare provider before taking anything new
+- Flag concerning medication questions urgently
+"""

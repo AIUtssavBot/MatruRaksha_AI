@@ -429,10 +429,10 @@ def setup_scheduler():
     schedule.every().day.at("08:00").do(send_daily_reminders)
     logger.info("✓ Daily reminders: 8:00 AM")
     
-    # Medication Reminders - 9:00 AM and 6:30 PM
+    # Medication Reminders - 9:00 AM and 7:30 PM
     schedule.every().day.at("09:00").do(send_medication_reminders_morning)
-    schedule.every().day.at("18:30").do(send_medication_reminders_evening)
-    logger.info("✓ Medication reminders: 9:00 AM, 6:30 PM")
+    schedule.every().day.at("19:30").do(send_medication_reminders_evening)
+    logger.info("✓ Medication reminders: 9:00 AM, 7:30 PM")
     
     # Milestone Check - 10:00 AM
     schedule.every().day.at("10:00").do(check_milestone_reminders)

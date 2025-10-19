@@ -1,200 +1,304 @@
 """
-Agent Orchestrator for MatruRakshaAI
-Coordinates all AI agents and manages their interactions
+MatruRaksha AI - Orchestrator Agent
+Routes messages to specialized agents based on intent classification
+
+Agents:
+- ASHA Agent: Community health, appointments, local resources
+- Care Agent: General pregnancy care, wellness tips
+- Emergency Agent: Urgent symptoms, crisis situations
+- Medication Agent: Medicine queries, prescriptions, side effects
+- Nutrition Agent: Diet plans, nutrition advice, recipes
+- Risk Agent: Risk assessment, complications, warning signs
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-import asyncio
+import os
+import logging
+from typing import Dict, Any, Optional, List
 from enum import Enum
 
-from .risk_agent import RiskAgent
-from .care_agent import CareAgent
-from .nutrition_agent import NutritionAgent
-from .medication_agent import MedicationAgent
-from .emergency_agent import EmergencyAgent
-from .asha_agent import AshaAgent
+logger = logging.getLogger(__name__)
+
+# Try to import Gemini for intent classification
+try:
+    import google.generativeai as genai
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
+        GEMINI_AVAILABLE = True
+    else:
+        GEMINI_AVAILABLE = False
+except:
+    GEMINI_AVAILABLE = False
 
 
-class AgentPriority(str, Enum):
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+class AgentType(Enum):
+    """Available agent types"""
+    ASHA = "asha_agent"
+    CARE = "care_agent"
+    EMERGENCY = "emergency_agent"
+    MEDICATION = "medication_agent"
+    NUTRITION = "nutrition_agent"
+    RISK = "risk_agent"
+    GENERAL = "general"  # Fallback
 
 
-class AgentOrchestrator:
+class MessageIntent:
+    """Message intent classification keywords"""
+    EMERGENCY_KEYWORDS = [
+        'bleeding', 'blood', 'pain', 'severe', 'emergency', 'help', 'urgent',
+        'hospital', 'ambulance', 'cant breathe', "can't breathe", 'chest pain', 
+        'dizzy', 'faint', 'contractions', 'baby not moving', 'fluid leaking',
+        'heavy bleeding', 'unconscious', 'seizure', 'stroke'
+    ]
+    
+    MEDICATION_KEYWORDS = [
+        'medicine', 'medication', 'drug', 'pill', 'tablet', 'prescription',
+        'dose', 'dosage', 'side effect', 'pharmacy', 'vitamin', 'supplement',
+        'paracetamol', 'iron', 'folic acid', 'calcium', 'aspirin', 'antibiotic'
+    ]
+    
+    NUTRITION_KEYWORDS = [
+        'food', 'eat', 'diet', 'nutrition', 'meal', 'recipe', 'hungry',
+        'weight', 'protein', 'calcium', 'vitamin', 'fruit', 'vegetable',
+        'breakfast', 'lunch', 'dinner', 'snack', 'drink', 'water', 'healthy eating'
+    ]
+    
+    RISK_KEYWORDS = [
+        'risk', 'complication', 'danger', 'warning', 'concern', 'problem',
+        'high blood pressure', 'diabetes', 'gestational', 'preeclampsia',
+        'anemia', 'infection', 'fever', 'swelling', 'miscarriage'
+    ]
+    
+    ASHA_KEYWORDS = [
+        'appointment', 'visit', 'clinic', 'doctor', 'hospital', 'checkup',
+        'anc', 'antenatal', 'vaccination', 'test', 'scan', 'ultrasound',
+        'local', 'nearby', 'asha', 'health worker', 'community', 'nearest hospital'
+    ]
+    
+    CARE_KEYWORDS = [
+        'pregnancy', 'trimester', 'week', 'month', 'baby', 'fetus',
+        'movement', 'kicks', 'growth', 'development', 'normal', 'common',
+        'symptom', 'feeling', 'tired', 'nausea', 'morning sickness', 'back pain'
+    ]
+
+
+class OrchestratorAgent:
     """
-    Main orchestrator that coordinates all specialized agents
+    Orchestrator that routes messages to appropriate specialized agents
     """
     
     def __init__(self):
-        self.risk_agent = RiskAgent()
-        self.care_agent = CareAgent()
-        self.nutrition_agent = NutritionAgent()
-        self.medication_agent = MedicationAgent()
-        self.emergency_agent = EmergencyAgent()
-        self.asha_agent = AshaAgent()
-        
-        self.agent_history = []
-        
-    async def process_mother_data(self, mother_data: Dict[str, Any]) -> Dict[str, Any]:
+        self.agents = {}
+        self._load_agents()
+    
+    def _load_agents(self):
+        """Lazy load agents when needed"""
+        try:
+            from agents.asha_agent import AshaAgent
+            from agents.care_agent import CareAgent
+            from agents.emergency_agent import EmergencyAgent
+            from agents.medication_agent import MedicationAgent
+            from agents.nutrition_agent import NutritionAgent
+            from agents.risk_agent import RiskAgent
+            
+            self.agents = {
+                AgentType.ASHA: AshaAgent(),
+                AgentType.CARE: CareAgent(),
+                AgentType.EMERGENCY: EmergencyAgent(),
+                AgentType.MEDICATION: MedicationAgent(),
+                AgentType.NUTRITION: NutritionAgent(),
+                AgentType.RISK: RiskAgent()
+            }
+            logger.info("✅ All agents loaded successfully")
+        except ImportError as e:
+            logger.warning(f"⚠️ Some agents not available: {e}")
+            self.agents = {}
+    
+    def classify_intent(self, message: str) -> AgentType:
         """
-        Main entry point: Process complete mother data through all agents
+        Classify message intent using keyword matching + AI
+        Returns the most appropriate agent type
         """
-        print(f"[ORCHESTRATOR] Starting agent processing for mother: {mother_data.get('name', 'Unknown')}")
+        message_lower = message.lower()
         
-        results = {
-            "mother_id": mother_data.get("id"),
-            "timestamp": datetime.now().isoformat(),
-            "agents_executed": [],
-            "overall_status": "processing"
+        # Priority 1: Emergency detection (highest priority)
+        if any(keyword in message_lower for keyword in MessageIntent.EMERGENCY_KEYWORDS):
+            logger.info(f"🚨 EMERGENCY detected: {message[:50]}")
+            return AgentType.EMERGENCY
+        
+        # Priority 2: Specific domain keywords
+        keyword_scores = {
+            AgentType.MEDICATION: sum(1 for kw in MessageIntent.MEDICATION_KEYWORDS if kw in message_lower),
+            AgentType.NUTRITION: sum(1 for kw in MessageIntent.NUTRITION_KEYWORDS if kw in message_lower),
+            AgentType.RISK: sum(1 for kw in MessageIntent.RISK_KEYWORDS if kw in message_lower),
+            AgentType.ASHA: sum(1 for kw in MessageIntent.ASHA_KEYWORDS if kw in message_lower),
+            AgentType.CARE: sum(1 for kw in MessageIntent.CARE_KEYWORDS if kw in message_lower)
         }
         
+        # Get highest scoring agent
+        best_agent = max(keyword_scores.items(), key=lambda x: x[1])
+        if best_agent[1] > 0:
+            logger.info(f"📍 Intent classified: {best_agent[0].value} (score: {best_agent[1]})")
+            return best_agent[0]
+        
+        # Priority 3: Use AI classification if available
+        if GEMINI_AVAILABLE:
+            try:
+                ai_agent = self._ai_classify(message)
+                if ai_agent:
+                    return ai_agent
+            except Exception as e:
+                logger.error(f"AI classification error: {e}")
+        
+        # Default to general care agent
+        logger.info("📍 No specific intent - using CARE agent")
+        return AgentType.CARE
+    
+    def _ai_classify(self, message: str) -> Optional[AgentType]:
+        """Use Gemini AI for intent classification (fast)"""
         try:
-            # Step 1: Risk Assessment (CRITICAL - Always first)
-            print("[ORCHESTRATOR] Step 1: Risk Assessment")
-            risk_result = await self.risk_agent.assess_risk(mother_data)
-            results["risk_assessment"] = risk_result
-            results["agents_executed"].append("risk_agent")
+            model = genai.GenerativeModel('gemini-2 .5-flash')
             
-            # Step 2: Check for Emergency (if high risk)
-            if risk_result["risk_level"] in ["high", "critical"]:
-                print("[ORCHESTRATOR] Step 2: Emergency Check (High Risk Detected)")
-                emergency_result = await self.emergency_agent.evaluate_emergency(
-                    mother_data, risk_result
-                )
-                results["emergency_assessment"] = emergency_result
-                results["agents_executed"].append("emergency_agent")
-                
-                # If emergency, notify ASHA immediately
-                if emergency_result.get("is_emergency"):
-                    print("[ORCHESTRATOR] EMERGENCY DETECTED - Notifying ASHA")
-                    asha_notification = await self.asha_agent.send_emergency_alert(
-                        mother_data, emergency_result
-                    )
-                    results["asha_alert"] = asha_notification
-                    results["agents_executed"].append("asha_agent")
+            prompt = f"""
+Classify this maternal health message into ONE category:
+- EMERGENCY: urgent medical issues, bleeding, severe pain, crisis
+- MEDICATION: medicines, drugs, supplements, prescriptions
+- NUTRITION: food, diet, meals, eating, recipes
+- RISK: complications, risks, warning signs, concerns
+- ASHA: appointments, clinics, local health services, checkups
+- CARE: general pregnancy questions, symptoms, baby development
+
+Message: "{message}"
+
+Respond with ONLY the category name (one word).
+"""
             
-            # Step 3: Care Recommendations
-            print("[ORCHESTRATOR] Step 3: Generating Care Plan")
-            care_result = await self.care_agent.generate_care_plan(
-                mother_data, risk_result
-            )
-            results["care_plan"] = care_result
-            results["agents_executed"].append("care_agent")
+            response = model.generate_content(prompt)
+            category = response.text.strip().upper()
             
-            # Step 4: Nutrition Assessment
-            print("[ORCHESTRATOR] Step 4: Nutrition Analysis")
-            nutrition_result = await self.nutrition_agent.assess_nutrition(
-                mother_data, risk_result
-            )
-            results["nutrition_plan"] = nutrition_result
-            results["agents_executed"].append("nutrition_agent")
+            # Map to AgentType
+            category_map = {
+                'EMERGENCY': AgentType.EMERGENCY,
+                'MEDICATION': AgentType.MEDICATION,
+                'NUTRITION': AgentType.NUTRITION,
+                'RISK': AgentType.RISK,
+                'ASHA': AgentType.ASHA,
+                'CARE': AgentType.CARE
+            }
             
-            # Step 5: Medication Management
-            print("[ORCHESTRATOR] Step 5: Medication Review")
-            medication_result = await self.medication_agent.review_medications(
-                mother_data, risk_result
-            )
-            results["medication_plan"] = medication_result
-            results["agents_executed"].append("medication_agent")
-            
-            # Step 6: ASHA Follow-up Scheduling (for non-emergency cases)
-            if not results.get("emergency_assessment", {}).get("is_emergency"):
-                print("[ORCHESTRATOR] Step 6: Scheduling ASHA Follow-up")
-                asha_schedule = await self.asha_agent.schedule_follow_up(
-                    mother_data, risk_result, care_result
-                )
-                results["asha_schedule"] = asha_schedule
-                if "asha_agent" not in results["agents_executed"]:
-                    results["agents_executed"].append("asha_agent")
-            
-            results["overall_status"] = "completed"
-            print(f"[ORCHESTRATOR] Processing complete. Agents used: {results['agents_executed']}")
+            return category_map.get(category, AgentType.CARE)
             
         except Exception as e:
-            print(f"[ORCHESTRATOR] Error during processing: {str(e)}")
-            results["overall_status"] = "error"
-            results["error"] = str(e)
-        
-        # Store in history
-        self.agent_history.append(results)
-        
-        return results
+            logger.error(f"AI classification failed: {e}")
+            return None
     
-    async def process_query(self, mother_id: str, query: str, context: Dict = None) -> Dict[str, Any]:
+    async def route_message(
+        self, 
+        message: str, 
+        mother_context: Dict[str, Any],
+        reports_context: List[Dict[str, Any]]
+    ) -> str:
         """
-        Process natural language queries from mothers/ASHA workers
-        Routes to appropriate agent based on query intent
+        Route message to appropriate agent and get response
+        
+        Args:
+            message: User's message
+            mother_context: Mother's profile data
+            reports_context: Recent medical reports
+            
+        Returns:
+            Agent's response text
         """
-        print(f"[ORCHESTRATOR] Processing query: {query}")
+        # Classify intent
+        agent_type = self.classify_intent(message)
         
-        # Simple intent detection (can be enhanced with NLP)
-        query_lower = query.lower()
+        # Get appropriate agent
+        agent = self.agents.get(agent_type)
         
-        if any(word in query_lower for word in ["emergency", "urgent", "pain", "bleeding", "danger"]):
-            print("[ORCHESTRATOR] Routing to Emergency Agent")
-            return await self.emergency_agent.handle_query(mother_id, query, context)
+        if not agent:
+            # Fallback to generic Gemini response if agent not available
+            logger.warning(f"⚠️ Agent {agent_type} not available, using fallback")
+            return await self._fallback_response(message, mother_context, reports_context)
         
-        elif any(word in query_lower for word in ["food", "nutrition", "diet", "eat", "meal"]):
-            print("[ORCHESTRATOR] Routing to Nutrition Agent")
-            return await self.nutrition_agent.handle_query(mother_id, query, context)
-        
-        elif any(word in query_lower for word in ["medicine", "medication", "tablet", "dose"]):
-            print("[ORCHESTRATOR] Routing to Medication Agent")
-            return await self.medication_agent.handle_query(mother_id, query, context)
-        
-        elif any(word in query_lower for word in ["risk", "assess", "check"]):
-            print("[ORCHESTRATOR] Routing to Risk Agent")
-            return await self.risk_agent.handle_query(mother_id, query, context)
-        
-        else:
-            print("[ORCHESTRATOR] Routing to Care Agent (General)")
-            return await self.care_agent.handle_query(mother_id, query, context)
+        # Route to agent
+        try:
+            logger.info(f"📤 Routing to {agent_type.value}")
+            response = await agent.process_query(
+                query=message,
+                mother_context=mother_context,
+                reports_context=reports_context
+            )
+            return response
+        except Exception as e:
+            logger.error(f"Agent {agent_type} error: {e}")
+            return await self._fallback_response(message, mother_context, reports_context)
     
-    async def get_daily_summary(self, mother_id: str) -> Dict[str, Any]:
-        """
-        Generate daily health summary for a mother
-        """
-        print(f"[ORCHESTRATOR] Generating daily summary for mother: {mother_id}")
+    async def _fallback_response(
+        self, 
+        message: str,
+        mother_context: Dict[str, Any],
+        reports_context: List[Dict[str, Any]]
+    ) -> str:
+        """Fallback response using Gemini directly"""
+        if not GEMINI_AVAILABLE:
+            return (
+                "⚠️ I'm sorry, I'm having trouble processing your request right now. "
+                "Please try again in a moment or contact your healthcare provider if urgent."
+            )
         
-        # Gather data from all agents
-        tasks = [
-            self.risk_agent.get_current_status(mother_id),
-            self.care_agent.get_today_tasks(mother_id),
-            self.nutrition_agent.get_today_meals(mother_id),
-            self.medication_agent.get_today_medications(mother_id)
-        ]
-        
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        return {
-            "mother_id": mother_id,
-            "date": datetime.now().date().isoformat(),
-            "risk_status": results[0] if not isinstance(results[0], Exception) else None,
-            "care_tasks": results[1] if not isinstance(results[1], Exception) else None,
-            "nutrition": results[2] if not isinstance(results[2], Exception) else None,
-            "medications": results[3] if not isinstance(results[3], Exception) else None
-        }
-    
-    def get_agent_status(self) -> Dict[str, Any]:
-        """
-        Get status of all agents
-        """
-        return {
-            "orchestrator_status": "active",
-            "total_requests_processed": len(self.agent_history),
-            "agents": {
-                "risk_agent": self.risk_agent.get_status(),
-                "care_agent": self.care_agent.get_status(),
-                "nutrition_agent": self.nutrition_agent.get_status(),
-                "medication_agent": self.medication_agent.get_status(),
-                "emergency_agent": self.emergency_agent.get_status(),
-                "asha_agent": self.asha_agent.get_status()
-            }
-        }
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            
+            # Build context
+            context_info = f"""
+Mother Profile:
+- Name: {mother_context.get('name')}
+- Age: {mother_context.get('age')}
+- Gravida: {mother_context.get('gravida')}
+- Parity: {mother_context.get('parity')}
+- BMI: {mother_context.get('bmi')}
+
+Recent Reports: {len(reports_context)}
+"""
+            
+            if reports_context:
+                context_info += "\nRecent Analysis:\n"
+                for i, report in enumerate(reports_context[:2], 1):
+                    analysis = report.get('analysis_result', {})
+                    if analysis:
+                        risk = analysis.get('risk_level', 'unknown')
+                        context_info += f"Report {i}: Risk Level - {risk}\n"
+            
+            prompt = f"""
+You are a maternal health assistant for {mother_context.get('name')}.
+
+{context_info}
+
+User Question: {message}
+
+Provide a helpful, empathetic response in 2-3 paragraphs.
+If urgent, advise consulting healthcare provider immediately.
+
+Response:
+"""
+            
+            response = model.generate_content(prompt)
+            return response.text.replace('*', '').replace('_', '').replace('`', '')
+            
+        except Exception as e:
+            logger.error(f"Fallback response error: {e}")
+            return (
+                "I apologize, but I'm having difficulty processing your request. "
+                "Please try rephrasing your question or contact your healthcare provider."
+            )
 
 
-# Global instance
-orchestrator = AgentOrchestrator()
+# Global orchestrator instance
+_orchestrator = None
+
+def get_orchestrator() -> OrchestratorAgent:
+    """Get or create global orchestrator instance"""
+    global _orchestrator
+    if _orchestrator is None:
+        _orchestrator = OrchestratorAgent()
+    return _orchestrator

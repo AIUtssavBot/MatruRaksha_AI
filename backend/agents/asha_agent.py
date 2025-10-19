@@ -1,142 +1,129 @@
 """
-ASHA Agent - ASHA Worker Coordination
+MatruRaksha AI - Care and Nutrition Agents
 """
+from typing import Dict, Any, List, Optional
 
-from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from agents.base_agent import BaseAgent
 
 
-class AshaAgent:
-    """
-    Coordinates with ASHA workers for follow-ups and community care
-    """
+class AshaAgent(BaseAgent):
+    """Agent for community health services and appointments"""
     
     def __init__(self):
-        self.requests_processed = 0
-        self.asha_workers = {}  # Would be loaded from database
+        super().__init__(
+            agent_name="ASHA Agent",
+            agent_role="Community Health Services Coordinator"
+        )
     
-    async def send_emergency_alert(self, mother_data: Dict, emergency_result: Dict) -> Dict[str, Any]:
-        """Send emergency alert to ASHA worker"""
-        self.requests_processed += 1
-        
-        print(f"[ASHA AGENT] 🚨 Sending emergency alert to ASHA worker...")
-        
-        alert = {
-            "alert_type": "emergency",
-            "mother_id": mother_data.get("id"),
-            "mother_name": mother_data.get("name"),
-            "emergency_type": emergency_result.get("emergency_type"),
-            "severity": emergency_result.get("severity"),
-            "location": mother_data.get("address") or mother_data.get("location"),
-            "phone": mother_data.get("phone"),
-            "sent_at": datetime.now().isoformat(),
-            "asha_worker": self._get_assigned_asha(mother_data.get("location")),
-            "status": "sent"
-        }
-        
-        print(f"[ASHA AGENT] Emergency alert sent successfully")
-        
-        return alert
+    def build_context(self, mother_context: Dict, reports_context: List) -> str:
+        """Build context with appointment data from database"""
+        # Get database service
+        try:
+            from services.database_service import DatabaseService
+            
+            # Get upcoming appointments
+            upcoming = DatabaseService.get_upcoming_appointments(mother_context.get('id'))
+            next_appt = DatabaseService.get_next_appointment(mother_context.get('id'))
+            anc_status = DatabaseService.get_anc_schedule_status(mother_context.get('id'))
+            
+            context = super().build_context(mother_context, reports_context)
+            
+            # Add appointment information
+            context += f"\n\nAPPOINTMENT INFORMATION:"
+            context += f"\nPregnancy Week: {anc_status.get('pregnancy_week', 'Unknown')}"
+            context += f"\nCompleted ANC Visits: {anc_status.get('completed_visits', 0)}"
+            context += f"\nRecommended Visits: {anc_status.get('recommended_visits', 4)}"
+            
+            if next_appt:
+                appt_date = next_appt.get('appointment_date', '')[:10]
+                context += f"\n\nNEXT APPOINTMENT:"
+                context += f"\n- Type: {next_appt.get('appointment_type', 'Checkup')}"
+                context += f"\n- Date: {appt_date}"
+                context += f"\n- Location: {next_appt.get('appointment_location', 'Not specified')}"
+            else:
+                context += f"\n\nNEXT APPOINTMENT: None scheduled"
+            
+            if upcoming:
+                context += f"\n\nUPCOMING APPOINTMENTS ({len(upcoming)}):"
+                for i, appt in enumerate(upcoming[:3], 1):
+                    appt_date = appt.get('appointment_date', '')[:10]
+                    context += f"\n{i}. {appt.get('appointment_type')} on {appt_date}"
+            
+            return context
+            
+        except Exception as e:
+            logger.error(f"Error building ASHA context: {e}")
+            return super().build_context(mother_context, reports_context)
     
-    async def schedule_follow_up(self, mother_data: Dict, risk_result: Dict, care_result: Dict) -> Dict[str, Any]:
-        """Schedule follow-up visit with ASHA worker"""
-        self.requests_processed += 1
-        
-        print(f"[ASHA AGENT] Scheduling follow-up visit...")
-        
-        risk_level = risk_result.get("risk_level", "low")
-        
-        # Determine follow-up frequency based on risk
-        if risk_level == "critical":
-            days_until_visit = 1
-            visit_type = "Emergency home visit"
-        elif risk_level == "high":
-            days_until_visit = 3
-            visit_type = "Urgent home visit"
-        elif risk_level == "medium":
-            days_until_visit = 7
-            visit_type = "Regular checkup"
-        else:
-            days_until_visit = 14
-            visit_type = "Routine visit"
-        
-        visit_date = datetime.now() + timedelta(days=days_until_visit)
-        
-        schedule = {
-            "mother_id": mother_data.get("id"),
-            "mother_name": mother_data.get("name"),
-            "visit_type": visit_type,
-            "scheduled_date": visit_date.strftime("%Y-%m-%d"),
-            "scheduled_time": "10:00 AM",
-            "asha_worker": self._get_assigned_asha(mother_data.get("location")),
-            "visit_purpose": self._generate_visit_purpose(risk_result, care_result),
-            "location": mother_data.get("location"),
-            "status": "scheduled",
-            "reminders": {
-                "mother": f"ASHA visit scheduled for {visit_date.strftime('%B %d, %Y')}",
-                "asha": f"Home visit for {mother_data.get('name')} on {visit_date.strftime('%B %d, %Y')}"
-            }
-        }
-        
-        print(f"[ASHA AGENT] Follow-up scheduled for {visit_date.strftime('%Y-%m-%d')}")
-        
-        return schedule
-    
-    def _get_assigned_asha(self, location: str) -> Dict:
-        """Get ASHA worker assigned to area"""
-        # This would query database in real implementation
-        return {
-            "name": "Asha Devi",
-            "phone": "+91-9876543210",
-            "area": "Sector 5",
-            "experience": "8 years"
-        }
-    
-    def _generate_visit_purpose(self, risk_result: Dict, care_result: Dict) -> List[str]:
-        """Generate checklist for ASHA visit"""
-        purposes = [
-            "Check vital signs (BP, weight)",
-            "Review medication compliance",
-            "Assess nutrition status"
-        ]
-        
-        risk_factors = risk_result.get("risk_factors", [])
-        for factor in risk_factors:
-            if factor.get("factor") == "blood_pressure":
-                purposes.append("Monitor blood pressure closely")
-            elif factor.get("factor") == "hemoglobin":
-                purposes.append("Check for anemia symptoms")
-            elif factor.get("factor") == "bmi":
-                purposes.append("Nutritional counseling")
-        
-        purposes.append("Answer any questions or concerns")
-        
-        return purposes
-    
-    async def report_visit(self, visit_data: Dict) -> Dict[str, Any]:
-        """Report completed ASHA visit"""
-        print(f"[ASHA AGENT] Recording ASHA visit report...")
-        
-        return {
-            "visit_id": f"V{int(datetime.now().timestamp())}",
-            "recorded_at": datetime.now().isoformat(),
-            "status": "completed",
-            "report": visit_data
-        }
-    
-    async def get_asha_dashboard(self, asha_id: str) -> Dict[str, Any]:
-        """Get dashboard for ASHA worker"""
-        return {
-            "asha_id": asha_id,
-            "today_visits": 3,
-            "pending_visits": 5,
-            "high_risk_mothers": 2,
-            "upcoming_deliveries": 4,
-            "emergency_alerts": 0
-        }
-    
-    def get_status(self) -> Dict:
-        return {
-            "status": "active",
-            "requests_processed": str(self.requests_processed)
-        }
+    def get_system_prompt(self) -> str:
+        return """
+You are a COMMUNITY HEALTH SERVICES COORDINATOR for MatruRaksha AI.
+
+Your role: Connect mothers with local healthcare services, appointments, and community resources.
+
+CRITICAL: You have access to REAL appointment data from the database. Use this information to:
+- Tell mothers about their ACTUAL next appointment (date, type, location)
+- Check their ANC visit compliance
+- Remind them of upcoming appointments
+- Suggest scheduling if no appointments exist
+
+AREAS YOU COVER:
+- Scheduling prenatal appointments
+- Finding nearby clinics/hospitals
+- Government health schemes
+- ASHA worker services
+- Vaccination schedules
+- Antenatal checkup reminders
+- Delivery planning
+- Postnatal care coordination
+
+ANTENATAL CARE SCHEDULE:
+- First visit: As soon as pregnancy confirmed
+- Weeks 4-28: Every 4 weeks
+- Weeks 28-36: Every 2 weeks
+- Weeks 36-40: Weekly
+- Minimum 4 ANC visits recommended
+
+ESSENTIAL SERVICES:
+- Blood tests (hemoglobin, blood group, etc.)
+- Urine tests
+- Ultrasound scans (2-3 during pregnancy)
+- Tetanus vaccination
+- Iron and folic acid supplementation
+- Health education
+
+GOVERNMENT SCHEMES (India):
+- Janani Suraksha Yojana (JSY) - Cash assistance for delivery
+- Pradhan Mantri Matru Vandana Yojana (PMMVY) - ₹5000 in 3 installments
+- Free delivery in government hospitals
+- Free medicines and diagnostics
+- ASHA incentives
+
+APPROACH:
+- ALWAYS mention their actual next appointment if available
+- Help with appointment planning
+- Provide information on local resources
+- Explain importance of each checkup
+- Simplify healthcare system navigation
+- Address transportation/financial concerns
+- Encourage community support utilization
+
+IMPORTANT INSTRUCTIONS:
+1. If asked about "next appointment/consultation/visit":
+   - Check the APPOINTMENT INFORMATION in the context
+   - If next appointment exists, tell them the EXACT date, type, and location
+   - If no appointment, suggest scheduling one based on their pregnancy week
+
+2. If asked about "appointment schedule" or "when should I visit":
+   - Check their pregnancy week and completed visits
+   - Recommend appropriate schedule based on trimester
+   
+3. Be specific with dates and locations from the database
+
+REMEMBER:
+- Access to care varies by location
+- Many schemes available for low-income families
+- ASHA workers are valuable resources
+- Regular checkups save lives
+- Use REAL data from context, don't make up appointments
+"""
