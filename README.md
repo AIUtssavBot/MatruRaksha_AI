@@ -42,6 +42,12 @@ MatruRakshaAI is an intelligent maternal health monitoring system that leverages
 - Natural language query processing
 - Emergency protocol activation
 
+### 🌐 Multilingual Chatbot (Upcoming / In progress)
+- Natural-language conversational support in multiple Indian languages (Hindi, Tamil, Telugu, Bengali, Marathi, and more)
+- Automatic language detection and user-preferred language persistence
+- Voice & text modes: receive voice messages, transcribe, and respond in the user's language
+- Localized prompts and culturally-aware responses for better engagement and comprehension
+
 ### 📊 **Continuous Care System**
 - Daily health monitoring (40-week journey)
 - Weekly automated assessments
@@ -273,78 +279,45 @@ python scheduler.py test
 
 ## 📡 API Documentation
 
-### **Core Endpoints**
+### Active API endpoints (implemented in `backend/main.py`)
 
-#### **Health Check**
-```http
-GET /health
-```
-Returns system health status and agent availability.
+The backend FastAPI app currently exposes the following endpoints by default (these are the routes actually registered in `backend/main.py`):
 
-#### **Register Mother**
-```http
-POST /mothers/register
-Content-Type: application/json
+- GET /                — Root endpoint (basic info, links to /docs)
+- GET /health          — Health check for the backend and services
 
-{
-  "name": "string",
-  "phone": "string",
-  "age": integer,
-  "gravida": integer,
-  "parity": integer,
-  "bmi": float,
-  "location": "string",
-  "telegram_chat_id": "string" (optional)
-}
-```
+- POST /mothers/register      — Register a new mother (JSON body, see the `Mother` model)
+- GET  /mothers               — List all registered mothers
+- GET  /mothers/{mother_id}   — Get a specific mother by ID
 
-#### **Risk Assessment**
-```http
-POST /risk/assess
-Content-Type: application/json
+- POST /analyze-report        — Analyze a medical report using Gemini AI (request body: report_id, mother_id, file_url, file_type)
+- GET  /reports/{mother_id}   — Get all medical reports for a mother
+- GET  /reports/telegram/{telegram_chat_id} — Get reports by Telegram chat id
 
-{
-  "mother_id": "string",
-  "systolic_bp": integer,
-  "diastolic_bp": integer,
-  "hemoglobin": float,
-  "symptoms": ["string"]
-}
-```
+- POST /risk/assess           — Submit a risk assessment (JSON body; see `RiskAssessment` model)
+- GET  /risk/mother/{mother_id} — Get risk assessments for a mother
 
-#### **Daily Check-in**
-```http
-POST /mothers/{mother_id}/daily-checkin
-Content-Type: application/json
+- GET  /analytics/dashboard   — Basic dashboard analytics (counts and risk distribution)
 
-{
-  "date": "YYYY-MM-DD",
-  "feeling_today": "good|okay|unwell",
-  "symptoms": ["string"],
-  "medications_taken": boolean
-}
-```
+Interactive docs are available at `http://localhost:8000/docs` when the backend is running.
 
-#### **AI Agent Query**
-```http
-POST /agents/query
-Content-Type: application/json
+Notes on optional/extra endpoints
 
-{
-  "mother_id": "string",
-  "query": "string"
-}
-```
+- `backend/enhanced_api.py` contains an `APIRouter` with many enhanced routes (prefixed with `/api/v1`, e.g. `/api/v1/reports/analyze`, `/api/v1/memory/store`, `/api/v1/agent/query`, etc.). That router is implemented in the file but is not automatically mounted into the FastAPI app in `main.py`.
 
-### **Agent Endpoints**
+  To enable the enhanced API routes, edit `backend/main.py` and add the router mounting (example):
 
-- `GET /agents/status` - Check all agent statuses
-- `GET /mothers/{id}/daily-summary` - AI-generated daily summary
-- `POST /mothers/{id}/weekly-assessment` - Trigger weekly assessment
-- `POST /mothers/{id}/report-symptom` - Emergency symptom reporting
+  ```python
+  from enhanced_api import router as enhanced_router
+  app.include_router(enhanced_router)
+  ```
 
-### **Full API Documentation**
-Visit `http://localhost:8000/docs` for interactive API documentation (Swagger UI).
+  After mounting the router, the enhanced endpoints will be available at `/api/v1/...`.
+
+If you want, I can:
+
+- Mount the enhanced router into `main.py` and update README/test the routes,
+- Or remove/merge duplicate endpoints into a single API surface.
 
 ---
 
@@ -576,6 +549,24 @@ For issues, questions, or contributions:
 - [ ] Doctor portal
 - [ ] SMS fallback for no internet
 - [ ] Offline mode support
+
+### Upcoming features (priority & notes)
+
+- High priority
+  - Multilingual chatbot (text + voice): support for Hindi, Tamil, Telugu, Bengali, Marathi and auto-detection. This will integrate speech-to-text, translation layers where necessary, and localized response templates to ensure clinical accuracy and cultural relevance.
+  - Offline & SMS fallback: critical for low-connectivity areas to ensure reminders and alerts still reach mothers and ASHA workers.
+
+- Medium priority
+  - WhatsApp integration: reach users on a widely used messaging platform with end-to-end message templates and OTP flows.
+  - Mobile app (iOS/Android): a lightweight app for ASHA workers with offline sync and push notifications.
+
+- Lower priority
+  - IoT integration (BP monitors, scales): collect objective vitals when available; begin with Bluetooth-enabled devices and a standardized ingestion pipeline.
+  - Doctor portal and advanced analytics: role-based dashboards for clinicians and predictive models for early warning.
+
+Notes:
+- The "Multilingual chatbot" feature will require data collection for localization, evaluation with healthcare professionals for safety, and careful privacy considerations for user speech and text data.
+
 
 ---
 
