@@ -68,7 +68,11 @@ MatruRakshaAI is an intelligent maternal health monitoring system that leverages
 
 ```
 ┌─────────────────────────────────────────────────────┐
+<<<<<<< HEAD
 │                  MatruRakshaAI                      │
+=======
+│                  MatruRakshaAI                       │
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 └─────────────────────────────────────────────────────┘
                          │
         ┌────────────────┼────────────────┐
@@ -145,7 +149,11 @@ MatruRakshaAI is an intelligent maternal health monitoring system that leverages
 
 ### **Prerequisites**
 - Python 3.11 or higher
+<<<<<<< HEAD
 - Node.js 20.19+ (Vite requires Node 20.19+ or 22.12+; using Node 20+ is recommended)
+=======
+- Node.js 18 or higher
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 - Supabase account
 - Telegram Bot Token
 
@@ -196,6 +204,7 @@ Run migrations in Supabase SQL Editor:
 ```bash
 cd frontend
 
+<<<<<<< HEAD
 # Ensure you are running Node 20.19+ (or Node 22+). If you see errors like
 # "crypto.hash is not a function" or a Vite Node version warning, upgrade Node.
 
@@ -203,6 +212,12 @@ cd frontend
 npm install
 
 # Create .env.local file (or edit existing `.env`)
+=======
+# Install dependencies
+npm install
+
+# Create .env.local file
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 cp .env.example .env.local
 # Edit with your configuration
 ```
@@ -211,6 +226,7 @@ cp .env.example .env.local
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+<<<<<<< HEAD
 # Base URL for backend API used by the frontend (example: https://your-backend.example)
 VITE_API_URL=http://localhost:8000
 ```
@@ -218,6 +234,11 @@ VITE_API_URL=http://localhost:8000
 Note: This project uses Vite (dev server on port 5173). If you run into the Vite Node version warning or the
 error "TypeError: crypto.hash is not a function", upgrade Node to v20.19+ (or v22.12+).
 
+=======
+VITE_API_URL=http://localhost:8000
+```
+
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 ### **5. Get Telegram Bot Token**
 
 1. Open Telegram and search for `@BotFather`
@@ -247,7 +268,11 @@ cd frontend
 npm run dev
 ```
 
+<<<<<<< HEAD
 Dashboard runs at: `http://localhost:5173` (Vite dev server)
+=======
+Dashboard runs at: `http://localhost:5173`
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 
 ### **Start Scheduler (For Automated Tasks)**
 
@@ -449,6 +474,7 @@ Agents can be configured in individual files:
 
 ### **Docker Deployment**
 
+<<<<<<< HEAD
 This project includes Dockerfiles for the backend and frontend. Example commands below show how to build and run
 the services locally without docker-compose.
 
@@ -473,6 +499,19 @@ docker run --rm -p 5173:5173 matruraksha-frontend:dev
 If you prefer a production frontend build, build with `npm run build` and serve via a static server (e.g., nginx) or
 use the multi-stage production Dockerfile pattern.
 
+=======
+```bash
+# Build images
+docker-compose build
+
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 ### **Production Considerations**
 
 1. **Environment Variables**: Use production keys

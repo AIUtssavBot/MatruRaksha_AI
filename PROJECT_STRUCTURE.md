@@ -16,19 +16,30 @@ maatru-raksha-ai/
 └─ .gitignore
 ```
 
+<<<<<<< HEAD
 ## Detailed backend layout
+=======
+## Detailed backend layout (actual)
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 
 ```
 backend/
 ├─ .env                      # local environment variables (should be in .gitignore and not committed)
 ├─ requirements.txt          # Python package requirements
+<<<<<<< HEAD
 ├─ package.json              # Node-related tooling for backend (optional)
+=======
+├─ package.json              # Node-related tooling for backend
+├─ package-lock.json        # Node lockfile
+├─ node_modules/            # Node dependencies (should not be committed)
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 ├─ verify_setup.py           # helper to validate environment
 ├─ main.py                   # primary application entry point (observed running with `python main.py`)
 ├─ enhanced_api.py           # alternate API runner or extended endpoints
 ├─ scheduler.py              # cron/periodic job runner
 ├─ telegram_bot.py           # bot runner/entrypoint for Telegram integration
 ├─ agents/                   # domain agents implementing business logic
+<<<<<<< HEAD
 │  ├─ orchestrator.py
 │  ├─ asha_agent.py
 │  ├─ care_agent.py
@@ -53,6 +64,21 @@ backend/
 └─ utils/
    ├─ helpers.py
    └─ validators.py
+=======
+│  └─ (asha_agent.py, care_agent.py, emergency_agent.py, medication_agent.py, nutrition_agent.py, orchestrator.py, risk_agent.py)
+├─ config/                   # configuration
+│  └─ (settings.py)
+├─ middleware/               # middleware and auth
+│  └─ (auth.py)
+├─ models/                   # DB models and schemas
+│  └─ (database.py, schemas.py)
+├─ services/                 # backend services
+│  └─ (document_analyzer.py, memory_service.py, notification_service.py, supabase_service.py, telegram_service.py, voice_service.py)
+├─ utils/                    # helpers and validators
+│  └─ (helpers.py, validators.py)
+├─ venv312/                  # COMMITTED virtualenv (should be removed and ignored)
+└─ __pycache__/
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 
 ```
 
@@ -152,6 +178,12 @@ Add the following lines to the top-level `.gitignore` (or to `backend/.gitignore
 backend/venv*/
 backend/.venv/
 
+<<<<<<< HEAD
+=======
+# Specific accidentally-committed venv found in this repo
+backend/venv312/
+
+>>>>>>> 6eb2a328ef725bea436f28cc077fc497fe3c112b
 # Environment files
 backend/.env
 frontend/.env.local
